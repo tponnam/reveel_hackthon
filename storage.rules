@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper function for user authentication
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    match /demos/{userId}/{demoId}/{fileName} {
+      // Anyone can watch the generated demo if they have the URL
+      allow read: if true;
+      
+      // The Next.js API route writes to this using the Admin SDK, 
+      // which bypasses these rules entirely!
+      // But we can add a fallback rule just in case the client needed it:
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    match /users/{userId}/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}

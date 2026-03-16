@@ -1,0 +1,121 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isPlatformAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    function isOrgMember(orgId) {
+      return isAuthenticated() && getUserData().orgId == orgId;
+    }
+
+    function isOrgAdmin(orgId) {
+      return isAuthenticated() && getUserData().orgId == orgId && getUserData().orgRole in ['admin', 'owner'];
+    }
+
+    // ------------------------------------------------------------------------
+    // PLATFORM SETTINGS, BLOGS, CAREERS
+    // ------------------------------------------------------------------------
+    match /platform/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isPlatformAdmin();
+    }
+    match /blog_posts/{postId} {
+      allow read: if true;
+      allow write: if isPlatformAdmin();
+    }
+    match /careers/{jobId} {
+      allow read: if true;
+      allow write: if isPlatformAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // SUPPORT TICKETS
+    // ------------------------------------------------------------------------
+    match /support_tickets/{ticketId} {
+      // Users can see their own, admins see all
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isPlatformAdmin());
+      // Users can create tickets
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Admins handle resolution/deletion
+      allow update, delete: if isPlatformAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // ORGANIZATIONS & INVITES
+    // ------------------------------------------------------------------------
+    match /organizations/{orgId} {
+      allow read: if isOrgMember(orgId) || isPlatformAdmin();
+      // Anyone can create an org during signup
+      allow create: if isAuthenticated();
+      allow update: if isOrgAdmin(orgId) || isPlatformAdmin();
+      allow delete: if isPlatformAdmin();
+    }
+
+    match /invoices/{invoiceId} {
+      // Users can see their own org's invoices, platform admin sees all
+      allow read: if isPlatformAdmin() || (isAuthenticated() && isOrgMember(resource.data.orgId));
+      allow write: if isPlatformAdmin();
+    }
+
+    match /invites/{inviteId} {
+      // Must be in the org to read invites, or an admin
+      allow read: if isOrgMember(resource.data.orgId) || isPlatformAdmin();
+      // Only org admins or platform admins can invite
+      allow create: if isOrgAdmin(request.resource.data.orgId) || isPlatformAdmin();
+      // Can be updated by org admins (to revoke) or anyone (to accept during signup)
+      allow update: if isAuthenticated();
+      allow delete: if isOrgAdmin(resource.data.orgId) || isPlatformAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // USERS
+    // ------------------------------------------------------------------------
+    match /users/{userId} {
+      // Can read if it's yourself, in your org, or platform admin
+      // Note: During signup (getDoc), resource might not exist yet, so we allow read if auth matches
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        (resource != null && isOrgMember(resource.data.orgId)) || 
+        isPlatformAdmin()
+      );
+      // Can create your own profile
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Can update if it's yourself or platform admin
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isPlatformAdmin());
+      // Can delete if platform admin
+      allow delete: if isPlatformAdmin();
+    }
+
+    // ------------------------------------------------------------------------
+    // DEMOS
+    // ------------------------------------------------------------------------
+    match /demos/{demoId} {
+      // Can read if you created it, it's in your org, or you are platform admin
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.orgId != null && isOrgMember(resource.data.orgId)) || 
+        isPlatformAdmin()
+      );
+      // Can create if you set yourself as owner
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // Can update/delete if yours, org admin, or platform admin
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        (resource.data.orgId != null && isOrgAdmin(resource.data.orgId)) ||
+        isPlatformAdmin()
+      );
+    }
+  }
+}

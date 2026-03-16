@@ -1,0 +1,86 @@
+================================================================================
+               REVEEL AI — GOOGLE CLOUD DEPLOYMENT EVIDENCE
+================================================================================
+
+Captured: 2026-03-16T13:10:00+05:30
+
+================================================================================
+1. CLOUD RUN SERVICE DETAILS
+================================================================================
+
+$ gcloud run services describe reveel-backend --region us-central1
+
+metadata:
+  labels:
+    cloud.googleapis.com/location: us-central1
+  name: reveel-backend
+spec:
+  template:
+    spec:
+      containerConcurrency: 160
+      containers:
+      - image: gcr.io/studio-592211117-913e5/reveel-backend:latest
+        resources:
+          limits:
+            cpu: '2'
+            memory: 4Gi
+status:
+  url: https://reveel-backend-wd7cck7ila-uc.a.run.app
+
+
+================================================================================
+2. CLOUD RUN REVISION HISTORY
+================================================================================
+
+$ gcloud run revisions list --service reveel-backend --region us-central1
+
+   REVISION                  ACTIVE  SERVICE         DEPLOYED                 DEPLOYED BY
+✔  reveel-backend-00010-tl5  yes     reveel-backend  2026-03-16 07:23:04 UTC  hello.toolskit@gmail.com
+✔  reveel-backend-00009-dqt          reveel-backend  2026-03-16 06:52:20 UTC  hello.toolskit@gmail.com
+✔  reveel-backend-00008-qqz          reveel-backend  2026-03-16 06:32:39 UTC  hello.toolskit@gmail.com
+✔  reveel-backend-00007-tpc          reveel-backend  2026-03-16 06:16:42 UTC  hello.toolskit@gmail.com
+✔  reveel-backend-00006-zr5          reveel-backend  2026-03-16 05:51:20 UTC  hello.toolskit@gmail.com
+
+
+================================================================================
+3. CLOUD BUILD HISTORY (5 MOST RECENT)
+================================================================================
+
+$ gcloud builds list --project studio-592211117-913e5 --limit 5
+
+ID                                    CREATE_TIME                DURATION  IMAGES                                                  STATUS
+7345717e-871c-41ec-b6f2-7823fa4c95e5  2026-03-16T07:18:22+00:00  3M5S     gcr.io/studio-592211117-913e5/reveel-backend (+1 more)  SUCCESS
+4a564068-db9e-43d1-a9ef-76ffbfdbe899  2026-03-16T06:47:26+00:00  2M45S    gcr.io/studio-592211117-913e5/reveel-backend (+1 more)  SUCCESS
+bbd38253-6a02-40fb-9ab4-6dade8c992f1  2026-03-16T06:25:39+00:00  2M59S    gcr.io/studio-592211117-913e5/reveel-backend (+1 more)  SUCCESS
+3f3fb247-b85c-4ab9-931a-0f4d6d2eac17  2026-03-16T06:11:09+00:00  3M45S    gcr.io/studio-592211117-913e5/reveel-backend (+1 more)  SUCCESS
+d6df43e7-24ac-4eb3-b568-870bde74a3f0  2026-03-16T05:46:46+00:00  3M22S    gcr.io/studio-592211117-913e5/reveel-backend (+1 more)  SUCCESS
+
+
+================================================================================
+4. CLOUD RUN LOGS — Multi-Agent Pipeline Execution Evidence
+================================================================================
+
+$ gcloud logging read 'resource.type="cloud_run_revision" ("VoiceAgent" OR "VideoAgent")'
+
+[VoiceAgent] TTS returned 10 chunks, total buffer size: 1134720 bytes
+[VoiceAgent] Audio file written: /tmp/demoforge/1773645926403/audio/full_narration.mp3 (1134720 bytes)
+[VoiceAgent] Generated full audio track, duration: 141840ms
+[VideoAgent] Using system FFmpeg.
+[VideoAgent] Running FFmpeg merge...
+[VideoAgent] Final video: /tmp/demoforge/.../output/demo.mp4
+[StorageAgent] Video uploaded: https://storage.googleapis.com/...
+
+
+================================================================================
+5. DOCKERFILE (Docker Container Running on Cloud Run)
+================================================================================
+
+FROM mcr.microsoft.com/playwright:v1.58.2-jammy
+RUN apt-get update && apt-get install -y ffmpeg
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["npm", "start"]

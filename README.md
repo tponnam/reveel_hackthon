@@ -111,4 +111,4 @@ The application is designed to run on **Google Cloud Run**.
 
 ## 📄 License
 
-Built for the **2025 Google AI Hackathon**.
+Built for the **2026 Google AI Hackathon**.
